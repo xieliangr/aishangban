@@ -43,8 +43,9 @@ class App : Application() {
             runCatching { writeCrashLog(thread, throwable) }
 
             // 交回系统默认处理器，确保进程正常结束，避免主线程死循环卡死
-            if (defaultHandler != null && defaultHandler !is CrashHandler) {
-                runCatching { defaultHandler.uncaughtException(thread, throwable) }
+            val previous = defaultHandler
+            if (previous != null && previous !is CrashHandler) {
+                runCatching { previous.uncaughtException(thread, throwable) }
             }
             Process.killProcess(Process.myPid())
             exitProcess(10)
