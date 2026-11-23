@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#FF2196F3</color>
+    <color name="primary_dark">#FF1976D2</color>
+    <color name="accent">#FF448AFF</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="weekday_on">#FF4CAF50</color>
+    <color name="weekday_off">#FF9E9E9E</color>
+</resources>
