@@ -3,6 +3,11 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// 版本号的唯一来源：versionCode / versionName / 桌面应用名都由这里生成，避免脱节。
+def appVersionCode = 1
+def appVersionName = '1.0.0'
+def appDisplayName = "爱上班 v${appVersionName}"
+
 android {
     namespace 'com.aishangban.auto'
     compileSdk 34
@@ -11,8 +16,10 @@ android {
         applicationId 'com.aishangban.auto'
         minSdk 31
         targetSdk 34
-        versionCode 1
-        versionName '1.0.0'
+        versionCode appVersionCode
+        versionName appVersionName
+        // 应用名 = 软件名 + 版本号，升版本时自动同步，无需手动改字符串资源
+        resValue 'string', 'app_name', appDisplayName
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
 
