@@ -1,9 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#FF2196F3</color>
-    <color name="primary_dark">#FF1976D2</color>
-    <color name="accent">#FF448AFF</color>
+    <color name="primary">#FF3F6FE4</color>
+    <color name="primary_dark">#FF2E56BC</color>
+    <color name="accent">#FF5B8DEF</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="weekday_on">#FF4CAF50</color>
-    <color name="weekday_off">#FF9E9E9E</color>
+
+    <!-- 页面与卡片 -->
+    <color name="page_bg">#FFF4F6FA</color>
+    <color name="card">#FFFFFFFF</color>
+    <color name="divider">#FFE6EAF2</color>
+    <color name="text_primary">#FF1F2733</color>
+    <color name="text_secondary">#FF8A93A6</color>
+
+    <!-- 状态条 -->
+    <color name="status_bar_bg">#FFEAF1FE</color>
+    <color name="status_running">#FF2E9E5B</color>
+    <color name="status_stopped">#FF9AA3B2</color>
+
+    <!-- 时间段条目 -->
+    <color name="time_item_bg">#FFF7F9FD</color>
+    <color name="time_badge_bg">#FFE8EFFC</color>
+    <color name="time_badge_text">#FF3F6FE4</color>
+
+    <!-- 星期按钮 -->
+    <color name="weekday_on">#FF3F6FE4</color>
+    <color name="weekday_off">#FFD8DEE9</color>
+    <color name="weekday_off_text">#FF5C6675</color>
+
+    <!-- 操作按钮 -->
+    <color name="danger">#FFE5484D</color>
+    <color name="warning">#FFF09324</color>
+    <color name="success">#FF2E9E5B</color>
 </resources>

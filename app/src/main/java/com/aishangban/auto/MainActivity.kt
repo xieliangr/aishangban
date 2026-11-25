@@ -20,8 +20,6 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import java.util.Calendar
 import kotlin.math.roundToInt
 
@@ -47,7 +45,6 @@ class MainActivity : AppCompatActivity() {
     private val weekdayButtons = mutableMapOf<Int, Button>()
     private val weekdayButtonState = mutableMapOf<Int, Boolean>()
 
-    private lateinit var timeAdapter: TimeAdapter
     private var pendingStartHour = 0
     private var pendingStartMinute = 0
 
@@ -74,7 +71,6 @@ class MainActivity : AppCompatActivity() {
         val statusText = findViewById<TextView>(R.id.serviceStatus)
         val iconContainer = findViewById<LinearLayout>(R.id.iconListContainer)
         val weekdayContainer = findViewById<LinearLayout>(R.id.weekdayContainer)
-        val timeList = findViewById<RecyclerView>(R.id.timeList) ?: return
 
         updateServiceStatus(statusText)
 
@@ -83,14 +79,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (weekdayContainer != null) initWeekdayButtons(weekdayContainer)
 
-        timeAdapter = TimeAdapter(timeRanges) { position ->
-            if (position in timeRanges.indices) {
-                timeRanges.removeAt(position)
-                timeAdapter.notifyItemRemoved(position)
-            }
-        }
-        timeList.layoutManager = LinearLayoutManager(this)
-        timeList.adapter = timeAdapter
+        renderTimeList()
 
         findViewById<View>(R.id.btnStartService)?.setOnClickListener {
             runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
@@ -109,68 +98,112 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnSave)?.setOnClickListener { saveAll() }
     }
 
+    /**
+     * 重新渲染时间段列表。
+     *
+     * 这里改用 LinearLayout 平铺条目，而不是 RecyclerView：
+     * 页面外层是 ScrollView，ScrollView 里嵌套 wrap_content 的 RecyclerView
+     * 在部分系统上高度测量不可靠，只会显示第一个条目，导致第二个时间段
+     * “看不到也滑不到”。时间段数量很少（通常 1~3 个），直接平铺更简单可靠，
+     * 且能随外层 ScrollView 一起正常滚动。
+     */
+    private fun renderTimeList() {
+        val container = findViewById<LinearLayout>(R.id.timeList) ?: return
+        container.removeAllViews()
+
+        if (timeRanges.isEmpty()) {
+            val empty = TextView(this).apply {
+                text = getString(R.string.time_empty)
+                textSize = 13f
+                setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+                gravity = android.view.Gravity.CENTER
+                setPadding(0, dpToPx(24), 0, dpToPx(24))
+            }
+            container.addView(empty)
+        } else {
+            timeRanges.forEachIndexed { index, range ->
+                container.addView(createTimeRow(range, index))
+            }
+        }
+
+        findViewById<TextView>(R.id.timeCountText)?.text =
+            getString(R.string.time_count, timeRanges.size)
+    }
+
+    private fun createTimeRow(range: TimeRange, index: Int): View {
+        val row = layoutInflater.inflate(R.layout.item_time, null, false)
+        val indexText = row.findViewById<TextView>(R.id.timeIndex)
+        indexText.text = (index + 1).toString()
+
+        row.findViewById<TextView>(R.id.timeText).text = range.displayText
+
+        row.findViewById<View>(R.id.deleteBtn).setOnClickListener {
+            // 用捕获的 index 删除，删除后立即重绘，避免持有旧 position 越界
+            if (index in timeRanges.indices) {
+                timeRanges.removeAt(index)
+                renderTimeList()
+            }
+        }
+        return row
+    }
+
     private fun createCoordRow(step: Int): LinearLayout {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(48)
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(50)
             )
-            setPadding(0, dpToPx(4), 0, dpToPx(4))
+            setPadding(0, dpToPx(3), 0, dpToPx(3))
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
 
-        val switch = Switch(this).apply { isChecked = iconManager.isEnabled(step) }
+        val switch = Switch(this).apply {
+            isChecked = iconManager.isEnabled(step)
+            layoutParams = LinearLayout.LayoutParams(dpToPx(44), -2)
+        }
         switches[step] = switch
         row.addView(switch)
 
         val label = TextView(this).apply {
             text = step.toString()
-            textSize = 14f
+            textSize = 15f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
         }
         row.addView(label)
 
         val saved = iconManager.getPoint(step)
-        val xInput = EditText(this).apply {
-            hint = "X"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            textSize = 14f
-            gravity = android.view.Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(dpToPx(70), -2).apply {
-                setMargins(dpToPx(4), 0, dpToPx(4), 0)
-            }
-            saved?.let { setText(it.x.toString()) }
-        }
-        val yInput = EditText(this).apply {
-            hint = "Y"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            textSize = 14f
-            gravity = android.view.Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(dpToPx(70), -2).apply {
-                setMargins(dpToPx(4), 0, dpToPx(4), 0)
-            }
-            saved?.let { setText(it.y.toString()) }
-        }
+        val xInput = makeCoordInput("X", saved?.x?.toString().orEmpty(), 70)
+        val yInput = makeCoordInput("Y", saved?.y?.toString().orEmpty(), 70)
         row.addView(xInput)
         row.addView(yInput)
         coordInputs[step] = xInput to yInput
 
-        val delayInput = EditText(this).apply {
-            hint = "秒"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            textSize = 14f
-            gravity = android.view.Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(dpToPx(55), -2).apply {
-                setMargins(dpToPx(4), 0, dpToPx(4), 0)
-            }
-            setText(iconManager.getPointDelay(step).toString())
-        }
+        val delayInput = makeCoordInput("秒", iconManager.getPointDelay(step).toString(), 60)
         row.addView(delayInput)
         delayInputs[step] = delayInput
 
         return row
     }
+
+    /** 统一的坐标/间隔输入框：圆角背景、居中、数字键盘。 */
+    private fun makeCoordInput(hint: String, value: String, widthDp: Int): EditText =
+        EditText(this).apply {
+            this.hint = hint
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            textSize = 14f
+            gravity = android.view.Gravity.CENTER
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            background = ContextCompat.getDrawable(context, R.drawable.bg_input)
+            setPadding(0, dpToPx(10), 0, dpToPx(10))
+            layoutParams = LinearLayout.LayoutParams(dpToPx(widthDp), -2).apply {
+                setMargins(dpToPx(3), 0, dpToPx(3), 0)
+            }
+            if (value.isNotEmpty()) setText(value)
+        }
 
     private fun initWeekdayButtons(container: LinearLayout) {
         val labels = arrayOf("日", "一", "二", "三", "四", "五", "六")
@@ -178,10 +211,12 @@ class MainActivity : AppCompatActivity() {
             val dayOfWeek = i + 1
             val button = Button(this).apply {
                 text = labels[i]
-                textSize = 12f
+                textSize = 14f
                 isAllCaps = false
-                layoutParams = LinearLayout.LayoutParams(0, dpToPx(42), 1f).apply {
-                    setMargins(dpToPx(2), 0, dpToPx(2), 0)
+                minHeight = 0
+                minimumHeight = 0
+                layoutParams = LinearLayout.LayoutParams(0, dpToPx(44), 1f).apply {
+                    setMargins(dpToPx(3), 0, dpToPx(3), 0)
                 }
             }
             val enabled = iconManager.isWeekdayEnabled(dayOfWeek)
@@ -199,17 +234,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateWeekdayButtonColor(button: Button, enabled: Boolean) {
-        button.setBackgroundColor(
+        button.background = roundedDrawable(
             ContextCompat.getColor(this, if (enabled) R.color.weekday_on else R.color.weekday_off)
         )
-        button.setTextColor(ContextCompat.getColor(this, R.color.white))
+        button.setTextColor(
+            ContextCompat.getColor(this, if (enabled) R.color.white else R.color.weekday_off_text)
+        )
     }
+
+    /** 生成圆角背景，让星期按钮更柔和。 */
+    private fun roundedDrawable(color: Int): android.graphics.drawable.GradientDrawable =
+        android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            cornerRadius = dpToPx(8).toFloat()
+            setColor(color)
+        }
 
     private fun updateServiceStatus(statusText: TextView?) {
         if (statusText == null) return
-        statusText.text = getString(
-            if (AutoAccessibilityService.isRunning) R.string.service_running
-            else R.string.service_stopped
+        val running = AutoAccessibilityService.isRunning
+        statusText.text = getString(if (running) R.string.service_running else R.string.service_stopped)
+        statusText.setTextColor(
+            ContextCompat.getColor(this, if (running) R.color.status_running else R.color.status_stopped)
         )
     }
 
@@ -228,7 +274,8 @@ class MainActivity : AppCompatActivity() {
                             toast("结束时间必须晚于开始时间")
                         } else {
                             timeRanges.add(range)
-                            timeAdapter.notifyItemInserted(timeRanges.size - 1)
+                            renderTimeList()
+                            toast("已添加第 ${timeRanges.size} 个时间段，别忘点保存")
                         }
                     },
                     now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), true
@@ -243,7 +290,7 @@ class MainActivity : AppCompatActivity() {
             for (i in 0 until prefs.timeCount) {
                 prefs.getRange(i)?.let { timeRanges.add(it) }
             }
-            if (::timeAdapter.isInitialized) timeAdapter.notifyDataSetChanged()
+            renderTimeList()
         }.onFailure { LogManager(this).log("加载配置异常", it.message ?: "") }
     }
 
