@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "com.aishangban.auto.app-mergeDebugResources-36:/layout/activity_log.xml",
+        "source": "com.aishangban.auto.app-main-39:/layout/activity_log.xml"
+    },
+    {
+        "merged": "com.aishangban.auto.app-mergeDebugResources-36:/layout/activity_main.xml",
+        "source": "com.aishangban.auto.app-main-39:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.aishangban.auto.app-mergeDebugResources-36:/layout/item_time.xml",
+        "source": "com.aishangban.auto.app-main-39:/layout/item_time.xml"
+    }
+]

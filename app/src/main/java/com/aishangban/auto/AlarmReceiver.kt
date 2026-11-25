@@ -22,7 +22,9 @@ import java.util.Random
  *    并用 runCatching 兜底，权限缺失时只记录日志而不崩溃；
  * 2) 取消与设置闹钟的 PendingIntent 使用完全一致的 flag（FLAG_IMMUTABLE），
  *    原版两处 flag 不同会导致 cancel 失败、重复闹钟叠加；
- * 3) onReceive 中 getAll 逻辑全部包 runCatching，单个时段异常不影响其它时段。
+ * 3) onReceive 中 getAll 逻辑全部包 runCatching，单个时段异常不影响其它时段；
+ * 4) 针对“运行几天后权限被 ROM 悄悄回收”的场景：不再因缺少精确闹钟权限而直接
+ *    放弃任务，改为 setWindow → set 逐级降级，保证定时任务持续可用。
  */
 class AlarmReceiver : BroadcastReceiver() {
 
@@ -52,6 +54,8 @@ class AlarmReceiver : BroadcastReceiver() {
     companion object {
         const val EXTRA_TIME_INDEX = "time_index"
         private const val MAX_LOOKAHEAD_DAYS = 365
+        /** 非精确闹钟的弹性窗口（10 分钟），权限被回收时仍可触发。 */
+        private const val FLEX_INTERVAL_MS = 10 * 60 * 1000L
 
         /** 重新计算并安排所有已保存时间段的闹钟。 */
         fun scheduleAlarms(context: Context) {
@@ -97,9 +101,15 @@ class AlarmReceiver : BroadcastReceiver() {
 
                 val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
                     ?: return
-                if (!canScheduleExact(alarmManager)) {
-                    LogManager(context).log("闹钟未安排", "缺少精确闹钟权限，请在系统设置中开启")
-                    return
+                val exact = canScheduleExact(alarmManager)
+                if (!exact) {
+                    // 精确闹钟权限可能被国产 ROM 在数天后或重启后悄悄回收。
+                    // 此时不再直接放弃任务，而是降级为非精确闹钟，保证任务继续执行
+                    // （代价是触发时间可能延后几分钟，对定时点击类任务可接受）。
+                    LogManager(context).log(
+                        "兼容模式",
+                        "精确闹钟权限未开启，改用非精确闹钟，任务仍会执行（可能延后数分钟）"
+                    )
                 }
 
                 val intent = Intent(context, AlarmReceiver::class.java).apply {
@@ -111,15 +121,33 @@ class AlarmReceiver : BroadcastReceiver() {
                     intent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-                alarmManager.setAlarmClock(
-                    AlarmManager.AlarmClockInfo(calendar.timeInMillis, pendingIntent),
-                    pendingIntent
-                )
+                if (exact) {
+                    alarmManager.setAlarmClock(
+                        AlarmManager.AlarmClockInfo(calendar.timeInMillis, pendingIntent),
+                        pendingIntent
+                    )
+                } else {
+                    // setWindow / set 均不需要 SCHEDULE_EXACT_ALARM 特殊权限。
+                    // 逐级兜底：setWindow 失败（部分定制 ROM 限制）时再退到 set。
+                    val scheduled = runCatching {
+                        alarmManager.setWindow(
+                            AlarmManager.RTC_WAKEUP,
+                            calendar.timeInMillis,
+                            FLEX_INTERVAL_MS,
+                            pendingIntent
+                        )
+                    }.isSuccess
+                    if (!scheduled) {
+                        runCatching {
+                            alarmManager.set(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
+                        }
+                    }
+                }
 
                 val label = if (forceTomorrow) "下次执行" else "首次执行"
                 val time = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
                     .format(Date(calendar.timeInMillis))
-                LogManager(context).log(label, time)
+                LogManager(context).log(label, "${if (exact) "精确" else "兼容"} $time")
             }.onFailure {
                 runCatching { LogManager(context).log("闹钟安排异常", it.message ?: "") }
             }

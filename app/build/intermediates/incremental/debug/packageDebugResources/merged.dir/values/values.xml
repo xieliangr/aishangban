@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent">#FF448AFF</color>
+    <color name="primary">#FF2196F3</color>
+    <color name="primary_dark">#FF1976D2</color>
+    <color name="weekday_off">#FF9E9E9E</color>
+    <color name="weekday_on">#FF4CAF50</color>
+    <color name="white">#FFFFFFFF</color>
+    <string name="accessibility_service_desc">爱上班需要在无障碍设置中开启后，才能在设定时间自动完成点击操作。</string>
+    <string name="add_time">添加时间段</string>
+    <string name="app_name">爱上班</string>
+    <string name="clear_log">清空日志</string>
+    <string name="execution_day">执行日</string>
+    <string name="execution_log">执行日志</string>
+    <string name="no_log">暂无执行记录</string>
+    <string name="save">保存设置</string>
+    <string name="service_running">服务状态: 运行中 ✓</string>
+    <string name="service_status">服务状态：未启动</string>
+    <string name="service_stopped">服务状态: 未启动 ✗</string>
+    <string name="setting_title">图标与点击设置</string>
+    <string name="start_service">开启无障碍服务</string>
+    <string name="stop">手动停止</string>
+    <string name="time_setting">执行时间段</string>
+    <string name="view_log">查看日志</string>
+    <style name="Theme.AiShangBan" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/accent</item>
+    </style>
+</resources>

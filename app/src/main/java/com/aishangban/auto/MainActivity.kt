@@ -300,13 +300,22 @@ class MainActivity : AppCompatActivity() {
 
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-            toast("请允许精确闹钟权限，否则定时任务不会执行")
-            runCatching {
-                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                    data = Uri.fromParts("package", packageName, null)
-                }
-                startActivity(intent)
-            }.onFailure { toast("无法打开闹钟权限设置，请手动开启") }
+            // 精确闹钟权限可能被国产 ROM 在数天后或重启后悄悄回收。
+            // 只在首次发现时引导一次：之前每次打开都自动跳系统设置页，
+            // 用户看到的就是“打开闪一下就退出”。之后保持静默，
+            // 任务调度层已自动降级为非精确闹钟，无需反复打扰。
+            if (!prefs.exactAlarmHintShown) {
+                prefs.markExactAlarmHintShown()
+                toast("请允许精确闹钟权限；未开启时任务将以兼容模式运行")
+                runCatching {
+                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    }
+                    startActivity(intent)
+                }.onFailure { toast("无法打开设置，任务将以兼容模式继续运行") }
+                // 补回可能被系统清掉的闹钟（以兼容模式重新排程）
+                AlarmReceiver.scheduleAlarms(this)
+            }
         }
     }
 

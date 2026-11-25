@@ -26,6 +26,24 @@
 8. **视图空指针**：所有 `findViewById` 安全获取；权限跳转包 `runCatching`；RecyclerView 删除用 `bindingAdapterPosition`。
 9. **重启后任务失效**：新增 `BootReceiver`，开机/升级后自动恢复闹钟。
 
+### 专项：运行几天后“打开闪一下就退出”（v1.0.1 加固）
+
+针对用户反馈的“第一次设置好正常，运行三四天后打开 App 闪一下就退出”，重新反编译原版定位到因果链：
+**首次授权 → 数天后 ROM/重启回收 `SCHEDULE_EXACT_ALARM` 权限 → `canScheduleExactAlarms()` 返回 false →
+原版无保护的 `startActivity` 抛 `ActivityNotFoundException` → 全局异常处理器吞掉异常 → 表现为闪退。**
+
+对应的处理：
+
+- `checkPermissions()` 中的跳转已包 `runCatching`（第 2 条），不会因设置页无法解析而崩溃；
+- 精确闹钟权限引导**只在首次发现缺失时执行一次**（`Prefs.exactAlarmHintShown` 标记），
+  避免每次启动都自动跳系统设置页造成“闪一下就跳走”的观感；
+- **权限丢失时任务不再停摆**：`AlarmReceiver.scheduleOne()` 由 `setAlarmClock()` 降级为
+  `setWindow()` → `set()` 逐级兜底（均不需要特殊权限），触发时间可能延后数分钟，但任务持续可用；
+  首次发现权限丢失时会重新排程，补回可能被系统清掉的闹钟。
+
+> 说明：精确闹钟权限被 ROM 回收是系统行为，代码无法阻止；新版保证的是“不闪退 + 任务继续跑”，
+> 若希望恢复精确触发，仍需在系统设置中手动开启一次权限。
+
 ## 功能
 
 - 设置 8 个可启用的点击坐标及各自延迟

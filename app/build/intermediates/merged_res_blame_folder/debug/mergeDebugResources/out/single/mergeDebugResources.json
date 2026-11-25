@@ -1,0 +1,30 @@
+[
+    {
+        "merged": "com.aishangban.auto.app-debug-37:/layout_item_time.xml.flat",
+        "source": "com.aishangban.auto.app-main-39:/layout/item_time.xml"
+    },
+    {
+        "merged": "com.aishangban.auto.app-debug-37:/xml_accessibility_service_config.xml.flat",
+        "source": "com.aishangban.auto.app-main-39:/xml/accessibility_service_config.xml"
+    },
+    {
+        "merged": "com.aishangban.auto.app-debug-37:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.aishangban.auto.app-main-39:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.aishangban.auto.app-debug-37:/mipmap-anydpi_ic_launcher.xml.flat",
+        "source": "com.aishangban.auto.app-main-39:/mipmap-anydpi/ic_launcher.xml"
+    },
+    {
+        "merged": "com.aishangban.auto.app-debug-37:/layout_activity_log.xml.flat",
+        "source": "com.aishangban.auto.app-main-39:/layout/activity_log.xml"
+    },
+    {
+        "merged": "com.aishangban.auto.app-debug-37:/mipmap-anydpi_ic_launcher_round.xml.flat",
+        "source": "com.aishangban.auto.app-main-39:/mipmap-anydpi/ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.aishangban.auto.app-debug-37:/layout_activity_main.xml.flat",
+        "source": "com.aishangban.auto.app-main-39:/layout/activity_main.xml"
+    }
+]

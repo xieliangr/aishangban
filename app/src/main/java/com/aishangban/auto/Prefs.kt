@@ -17,6 +17,14 @@ class Prefs(context: Context) {
 
     val timeCount: Int get() = prefs.getInt(KEY_TIME_COUNT, 0).coerceIn(0, MAX_TIMES)
 
+    /** 精确闹钟权限引导是否已经展示过（避免每次打开都跳系统设置页）。 */
+    val exactAlarmHintShown: Boolean
+        get() = prefs.getBoolean(KEY_EXACT_ALARM_HINT_SHOWN, false)
+
+    fun markExactAlarmHintShown() {
+        prefs.edit().putBoolean(KEY_EXACT_ALARM_HINT_SHOWN, true).apply()
+    }
+
     fun getRange(index: Int): TimeRange? {
         if (index !in 0 until timeCount) return null
         val sh = prefs.getInt("time_${index}_start_hour", -1)
@@ -49,6 +57,7 @@ class Prefs(context: Context) {
     companion object {
         private const val PREFS_NAME = "aishangban"
         private const val KEY_TIME_COUNT = "time_count"
+        private const val KEY_EXACT_ALARM_HINT_SHOWN = "exact_alarm_hint_shown"
         private const val MAX_TIMES = 50
     }
 }
