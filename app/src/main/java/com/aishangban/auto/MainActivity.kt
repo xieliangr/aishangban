@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         iconManager = IconConfigManager(this)
+        iconManager.ensureDefaults()
         prefs = Prefs(this)
 
         initViews()

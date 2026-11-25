@@ -16,6 +16,23 @@ class IconConfigManager(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    /**
+     * 首次安装时预置默认坐标（步骤 1~6），写入一次后打标记，
+     * 之后用户的任何修改或清空都不会被默认值覆盖。
+     */
+    fun ensureDefaults() {
+        if (prefs.getBoolean(KEY_DEFAULTS_INITIALIZED, false)) return
+        val editor = prefs.edit()
+        DEFAULT_POINTS.forEach { p ->
+            editor.putString(pointKey(p.step, "x"), p.x.toString())
+            editor.putString(pointKey(p.step, "y"), p.y.toString())
+            editor.putString(pointKey(p.step, "delay"), p.delaySeconds.toString())
+            editor.putBoolean(enabledKey(p.step), true)
+        }
+        editor.putBoolean(KEY_DEFAULTS_INITIALIZED, true)
+        editor.apply()
+    }
+
     fun getPoint(step: Int): ClickPoint? {
         val x = safeInt(prefs.getString(pointKey(step, "x"), null))
         val y = safeInt(prefs.getString(pointKey(step, "y"), null))
@@ -86,6 +103,18 @@ class IconConfigManager(context: Context) {
         private const val PREFS_NAME = "aishangban"
         private const val DEFAULT_DELAY = 10
         const val MAX_STEPS = 8
+        private const val KEY_DEFAULTS_INITIALIZED = "defaults_initialized_v1"
+
+        /** 默认坐标：步骤号 / X / Y / 延迟秒。步骤 7、8 留空由用户自行填写。 */
+        private data class DefaultPoint(val step: Int, val x: Int, val y: Int, val delaySeconds: Int)
+        private val DEFAULT_POINTS = listOf(
+            DefaultPoint(1, 533, 2323, 10),
+            DefaultPoint(2, 533, 2323, 10),
+            DefaultPoint(3, 150, 1230, 30),
+            DefaultPoint(4, 750, 1630, 30),
+            DefaultPoint(5, 335, 2323, 10),
+            DefaultPoint(6, 335, 2323, 10),
+        )
 
         private fun pointKey(step: Int, field: String) = "point_${step}_$field"
         private fun enabledKey(step: Int) = "icon_${step}_enabled"
