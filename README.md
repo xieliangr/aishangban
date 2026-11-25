@@ -26,7 +26,7 @@
 8. **视图空指针**：所有 `findViewById` 安全获取；权限跳转包 `runCatching`；RecyclerView 删除用 `bindingAdapterPosition`。
 9. **重启后任务失效**：新增 `BootReceiver`，开机/升级后自动恢复闹钟。
 
-### 专项：运行几天后“打开闪一下就退出”（v1.0.1 加固）
+### 专项：运行几天后“打开闪一下就退出”（1.0.0 内加固）
 
 针对用户反馈的“第一次设置好正常，运行三四天后打开 App 闪一下就退出”，重新反编译原版定位到因果链：
 **首次授权 → 数天后 ROM/重启回收 `SCHEDULE_EXACT_ALARM` 权限 → `canScheduleExactAlarms()` 返回 false →
