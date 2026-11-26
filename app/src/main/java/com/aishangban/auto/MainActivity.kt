@@ -3,8 +3,10 @@ package com.aishangban.auto
 import android.Manifest
 import android.app.AlarmManager
 import android.app.TimePickerDialog
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -48,6 +50,14 @@ class MainActivity : AppCompatActivity() {
     private var pendingStartHour = 0
     private var pendingStartMinute = 0
 
+    /** 监听无障碍服务连接/断开，即时刷新界面状态。 */
+    private val serviceStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            updateServiceStatus(findViewById(R.id.serviceStatus))
+        }
+    }
+    private var receiverRegistered = false
+
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -82,6 +92,11 @@ class MainActivity : AppCompatActivity() {
         renderTimeList()
 
         findViewById<View>(R.id.btnStartService)?.setOnClickListener {
+            if (!AutoAccessibilityService.isRunning &&
+                AccessibilityUtils.isEnabledInSystem(this)
+            ) {
+                toast("服务开启中未连接：请在设置里关闭再打开一次无障碍开关")
+            }
             runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                 .onFailure { toast("无法打开无障碍设置") }
         }
@@ -252,11 +267,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateServiceStatus(statusText: TextView?) {
         if (statusText == null) return
-        val running = AutoAccessibilityService.isRunning
-        statusText.text = getString(if (running) R.string.service_running else R.string.service_stopped)
-        statusText.setTextColor(
-            ContextCompat.getColor(this, if (running) R.color.status_running else R.color.status_stopped)
-        )
+        val connected = AutoAccessibilityService.isRunning
+        val enabledInSystem = AccessibilityUtils.isEnabledInSystem(this)
+        when {
+            connected -> {
+                statusText.text = getString(R.string.service_running)
+                statusText.setTextColor(ContextCompat.getColor(this, R.color.status_running))
+            }
+            enabledInSystem -> {
+                // 系统开关开着但进程内实例尚未绑定：进程重启后的过渡态，不是"未开启"。
+                // 系统会自行重新绑定，提示用户而不是误导其重复去设置页开关。
+                statusText.text = getString(R.string.service_reconnecting)
+                statusText.setTextColor(ContextCompat.getColor(this, R.color.status_reconnecting))
+            }
+            else -> {
+                statusText.text = getString(R.string.service_stopped)
+                statusText.setTextColor(ContextCompat.getColor(this, R.color.status_stopped))
+            }
+        }
     }
 
     private fun showRangePicker() {
@@ -367,9 +395,30 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (!receiverRegistered) {
+            runCatching {
+                registerReceiver(
+                    serviceStateReceiver,
+                    IntentFilter(AccessibilityUtils.ACTION_SERVICE_STATE_CHANGED)
+                )
+                receiverRegistered = true
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         updateServiceStatus(findViewById(R.id.serviceStatus))
+    }
+
+    override fun onStop() {
+        if (receiverRegistered) {
+            runCatching { unregisterReceiver(serviceStateReceiver) }
+            receiverRegistered = false
+        }
+        super.onStop()
     }
 
     private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).roundToInt()

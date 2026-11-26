@@ -26,5 +26,6 @@
     <string name="no_log">暂无执行记录</string>
     <string name="accessibility_service_desc">爱上班需要在无障碍设置中开启后，才能在设定时间自动完成点击操作。</string>
     <string name="service_running">● 服务状态：运行中</string>
+    <string name="service_reconnecting">● 服务状态：已开启，正在重新连接…</string>
     <string name="service_stopped">● 服务状态：未启动</string>
 </resources>

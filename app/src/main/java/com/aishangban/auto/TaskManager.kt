@@ -41,17 +41,49 @@ class TaskManager private constructor() {
             callback.onTaskError("至少需要2个坐标点")
             return
         }
-        if (!AutoAccessibilityService.isRunning) {
-            logManager?.log("启动失败", "无障碍服务未启动")
-            callback.onTaskError("无障碍服务未启动")
-            return
-        }
 
         this.steps = steps
         this.callback = callback
         this.logManager = LogManager(context)
+        // 先置为运行态，等待服务重连期间也持有唤醒锁、允许重试
         this.running = true
 
+        // v1.0.3：进程被回收重启后，系统无障碍开关仍在，但服务实例尚未绑定。
+        // 原实现直接判定「服务未启动」并放弃任务；这里改为等待服务重连后再执行。
+        if (!AutoAccessibilityService.isRunning) {
+            if (AccessibilityUtils.isEnabledInSystem(context)) {
+                logManager?.log("等待服务", "系统无障碍已开启，等待服务重新连接后执行")
+                waitForServiceAndRun(context, 0)
+            } else {
+                logManager?.log("启动失败", "无障碍服务未开启")
+                callback.onTaskError("无障碍服务未开启，请在系统设置中打开")
+                cleanup()
+            }
+            return
+        }
+
+        launchWorker(context)
+    }
+
+    /** 等待无障碍服务重新绑定，最多重试若干次，期间保持 WakeLock 防止进程被回收。 */
+    private fun waitForServiceAndRun(context: Context, attempt: Int) {
+        if (!running) return
+        if (AutoAccessibilityService.isRunning) {
+            logManager?.log("服务已重连", "开始执行任务")
+            launchWorker(context)
+            return
+        }
+        if (attempt >= SERVICE_WAIT_MAX_ATTEMPTS) {
+            logManager?.log("启动失败", "等待服务超时，任务跳过")
+            val cb = callback
+            cleanup()
+            cb?.onTaskError("无障碍服务连接超时，请重新打开应用")
+            return
+        }
+        mainHandler.postDelayed({ waitForServiceAndRun(context, attempt + 1) }, SERVICE_WAIT_STEP_MS)
+    }
+
+    private fun launchWorker(context: Context) {
         acquireWakeLock(context)
 
         val thread = HandlerThread("aishangban-worker").apply { start() }
@@ -164,6 +196,9 @@ class TaskManager private constructor() {
         private const val MIN_STEPS = 2
         const val MIN_STEPS_FOR_TASK = 2
         private const val WAKE_LOCK_TIMEOUT_MS = 600_000L
+        /** 服务重连等待：每 500ms 检查一次，最多约 10 秒。 */
+        private const val SERVICE_WAIT_STEP_MS = 500L
+        private const val SERVICE_WAIT_MAX_ATTEMPTS = 20
 
         @Volatile
         private var activeInstance: TaskManager? = null

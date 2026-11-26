@@ -15,6 +15,7 @@
     <!-- 状态条 -->
     <color name="status_bar_bg">#FFEAF1FE</color>
     <color name="status_running">#FF2E9E5B</color>
+    <color name="status_reconnecting">#FFF09324</color>
     <color name="status_stopped">#FF9AA3B2</color>
 
     <!-- 时间段条目 -->

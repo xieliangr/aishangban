@@ -21,6 +21,8 @@ class AutoAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        // 进程重启后系统可能延迟重新绑定服务；连接成功立即通知界面刷新状态
+        AccessibilityUtils.notifyServiceStateChanged(this)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
@@ -29,6 +31,7 @@ class AutoAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         if (instance === this) instance = null
+        AccessibilityUtils.notifyServiceStateChanged(this)
         super.onDestroy()
     }
 
