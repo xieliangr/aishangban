@@ -23,6 +23,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import java.util.Calendar
+import java.util.Date
+import java.text.SimpleDateFormat
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
@@ -49,6 +52,7 @@ class MainActivity : AppCompatActivity() {
 
     private var pendingStartHour = 0
     private var pendingStartMinute = 0
+    private var accessibilityWarnedThisSession = false
 
     /** 监听无障碍服务连接/断开，即时刷新界面状态。 */
     private val serviceStateReceiver = object : BroadcastReceiver() {
@@ -411,6 +415,33 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateServiceStatus(findViewById(R.id.serviceStatus))
+        ensureAlarmsAndWarnAccessibility()
+    }
+
+    /**
+     * v1.0.4：每次打开应用做两件事——
+     * 1) 系统无障碍开关被关（常见于国产 ROM 夜间强制停止/清理后台）时明确提示用户，
+     *    因为 App 无法自行重新打开该开关，只能引导用户去设置里开一次；
+     * 2) 每天兜底重新调度一次闹钟，防止闹钟被 ROM 清理后彻底失效。
+     */
+    private fun ensureAlarmsAndWarnAccessibility() {
+        // 无障碍被系统关闭时提示（只在本进程内提示一次，避免频繁弹出）
+        if (!AutoAccessibilityService.isRunning && !AccessibilityUtils.isEnabledInSystem(this)) {
+            if (!accessibilityWarnedThisSession) {
+                accessibilityWarnedThisSession = true
+                toast("无障碍服务已被系统关闭，请点「开启无障碍服务」重新打开，否则定时任务不会执行")
+            }
+        }
+
+        // 每天兜底重新排一次闹钟（保存配置的前提下）
+        if (prefs.timeCount > 0) {
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            if (prefs.alarmEnsureDay != today) {
+                AlarmReceiver.scheduleAlarms(this)
+                prefs.markAlarmEnsured(today)
+                LogManager(this).log("闹钟兜底", "每日重新调度已执行")
+            }
+        }
     }
 
     override fun onStop() {

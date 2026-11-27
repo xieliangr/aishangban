@@ -6,6 +6,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -29,11 +32,19 @@ import java.util.Random
 class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        // v1.0.4：进程夜间被回收后，闹钟会冷启动进程。BroadcastReceiver 默认生命周期极短，
+        // onReceive 一返回进程就可能被系统判定为空闲而杀掉，导致 TaskManager 里
+        // 「等待无障碍服务重连」的 postDelayed 逻辑根本执行不到。
+        // 用 goAsync() + WakeLock 把进程的活跃期撑开，直到任务成功启动。
+        val pendingResult = goAsync()
+        val wakeLock = acquireShortWakeLock(context)
+
         runCatching {
             val index = intent.getIntExtra(EXTRA_TIME_INDEX, -1)
             if (index < 0) return
 
             val log = LogManager(context)
+            log.log("闹钟触发", "时段 #${index + 1} 进程被唤醒，开始处理")
             val steps = IconConfigManager(context).getEnabledStepsWithDelays()
             if (steps.size < TaskManager.MIN_STEPS_FOR_TASK) {
                 log.log("闹钟触发", "时段 #${index + 1} 坐标点不足，跳过")
@@ -42,13 +53,44 @@ class AlarmReceiver : BroadcastReceiver() {
                 TaskManager.startNew(context, steps, object : TaskManager.TaskCallback {
                     override fun onStepStart(step: Int) = log.log("开始点击", "图标 #$step")
                     override fun onStepSuccess(step: Int) = log.log("点击成功", "图标 #$step")
-                    override fun onTaskError(message: String) = log.log("任务错误", message)
+                    override fun onTaskError(message: String) {
+                        log.log("任务错误", message)
+                        releaseShortWakeLock(wakeLock)
+                        runCatching { pendingResult.finish() }
+                    }
+                    override fun onTaskFinished() {
+                        // 任务结束后释放 goAsync，保证整个执行期间进程存活
+                        releaseShortWakeLock(wakeLock)
+                        runCatching { pendingResult.finish() }
+                    }
                 })
             }
+            // 无论任务是否启动，都先把下一天的闹钟排上，避免被 ROM 清理后彻底失效
             scheduleOne(context, index, forceTomorrow = true)
+
+            // 兜底：若任务在 RECEIVER_HOLD_MS 内没有回调完成（如服务一直没连上），
+            // 主动释放，避免长期占用 WakeLock。此时 TaskManager 自己的超时逻辑会收尾。
+            Handler(Looper.getMainLooper()).postDelayed({
+                releaseShortWakeLock(wakeLock)
+                runCatching { pendingResult.finish() }
+            }, RECEIVER_HOLD_MS)
         }.onFailure {
             runCatching { LogManager(context).log("闹钟处理异常", it.message ?: "") }
+            releaseShortWakeLock(wakeLock)
+            runCatching { pendingResult.finish() }
         }
+    }
+
+    private fun acquireShortWakeLock(context: Context): PowerManager.WakeLock? = runCatching {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return null
+        @Suppress("Deprecation")
+        val lock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "aishangban:alarm_receiver")
+        lock.acquire(RECEIVER_HOLD_MS + 5_000L)
+        lock
+    }.getOrNull()
+
+    private fun releaseShortWakeLock(lock: PowerManager.WakeLock?) {
+        runCatching { lock?.let { if (it.isHeld) it.release() } }
     }
 
     companion object {
@@ -56,6 +98,8 @@ class AlarmReceiver : BroadcastReceiver() {
         private const val MAX_LOOKAHEAD_DAYS = 365
         /** 非精确闹钟的弹性窗口（10 分钟），权限被回收时仍可触发。 */
         private const val FLEX_INTERVAL_MS = 10 * 60 * 1000L
+        /** goAsync 兜底持有时长：覆盖等待服务重连(约10秒) + 任务执行，留足余量。 */
+        private const val RECEIVER_HOLD_MS = 120_000L
 
         /** 重新计算并安排所有已保存时间段的闹钟。 */
         fun scheduleAlarms(context: Context) {

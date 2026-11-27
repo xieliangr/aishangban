@@ -5,8 +5,8 @@ plugins {
 
 // 版本号与包名的唯一来源：versionCode / versionName / 桌面应用名 / APK 文件名都由这里生成，避免脱节。
 // 规则：任何代码或资源变更都必须升版本（versionCode +1，versionName 递增），不要保持旧版本号。
-def appVersionCode = 4
-def appVersionName = '1.0.3'
+def appVersionCode = 5
+def appVersionName = '1.0.4'
 def appPackageName = 'com.aishangban.auto'
 def appDisplayName = "爱上班 v${appVersionName}"
 

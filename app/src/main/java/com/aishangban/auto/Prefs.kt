@@ -25,6 +25,14 @@ class Prefs(context: Context) {
         prefs.edit().putBoolean(KEY_EXACT_ALARM_HINT_SHOWN, true).apply()
     }
 
+    /** 当天是否已执行过闹钟兜底调度（每天最多一次，避免反复随机时间）。 */
+    val alarmEnsureDay: String
+        get() = prefs.getString(KEY_ALARM_ENSURE_DAY, "").orEmpty()
+
+    fun markAlarmEnsured(day: String) {
+        prefs.edit().putString(KEY_ALARM_ENSURE_DAY, day).apply()
+    }
+
     fun getRange(index: Int): TimeRange? {
         if (index !in 0 until timeCount) return null
         val sh = prefs.getInt("time_${index}_start_hour", -1)
@@ -58,6 +66,7 @@ class Prefs(context: Context) {
         private const val PREFS_NAME = "aishangban"
         private const val KEY_TIME_COUNT = "time_count"
         private const val KEY_EXACT_ALARM_HINT_SHOWN = "exact_alarm_hint_shown"
+        private const val KEY_ALARM_ENSURE_DAY = "alarm_ensure_day"
         private const val MAX_TIMES = 50
     }
 }
